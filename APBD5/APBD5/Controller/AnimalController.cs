@@ -1,8 +1,8 @@
-﻿using APBD5.Models;
+﻿using System.Data;
+using APBD5.Models;
 using APBD5.Models.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
-
 
 namespace Tutorial.Controllers;
 
@@ -12,7 +12,6 @@ namespace Tutorial.Controllers;
 [Route("api/[controller]")]
 public class AnimalsController : ControllerBase
 {
-
     private readonly IConfiguration _configuration;
     public AnimalsController(IConfiguration configuration)
     {
@@ -20,94 +19,113 @@ public class AnimalsController : ControllerBase
     }
     
     [HttpGet]
-    public IActionResult GetAnimals()
+    public IActionResult GetAnimals([FromQuery] string orderBy = "name")
     {
-        //Otwieramy polaczenie
-        SqlConnection connection=new SqlConnection(_configuration.GetConnectionString("Default"));
+        SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
         connection.Open();
-        
-        
-        
-        //Definiujemy commanda
         SqlCommand command = new SqlCommand();
         command.Connection = connection;
-        command.CommandText = "SELECT * FROM Animal";
+        string orderByClause = string.Empty;
         
-        //Wykonanie commanda
-        var reader = command.ExecuteReader();
-        List<Animal> animals = new List<Animal>();
-
-        int idAnimalOrdinal = reader.GetOrdinal("IdAnimal");
-        int nameOrdinal = reader.GetOrdinal("Name");
-        
-        while (reader.Read())
+        switch (orderBy.ToLower())
         {
-                animals.Add(new Animal()
-                {
-                    //Name = reader.GetString(1)
-                    IdAnimal = reader.GetInt32(idAnimalOrdinal),
-                    Name = reader.GetString(nameOrdinal)
-                    
-                });
+            case "name":
+                orderByClause = "ORDER BY Name";
+                break;
+            case "description":
+                orderByClause = "ORDER BY Description";
+                break;
+            case "category":
+                orderByClause = "ORDER BY Category";
+                break;
+            case "area":
+                orderByClause = "ORDER BY Area";
+                break;
+            default:
+                orderByClause = "ORDER BY Name";
+                break;
         }
-        
-        
-        return Ok(animals);
-    }
+        command.CommandText = $"SELECT * FROM Animal {orderByClause}";
+        using (var reader = command.ExecuteReader())
+        {
+            List<Animal> animals = new List<Animal>();
 
+            int idAnimalOrdinal = reader.GetOrdinal("IdAnimal");
+            int nameOrdinal = reader.GetOrdinal("Name");
+            int descriptionOrdinal = reader.GetOrdinal("Description");
+            int categoryOrdinal = reader.GetOrdinal("Category");
+            int areaOrdinal = reader.GetOrdinal("Area");
+            while (reader.Read())
+            {
+                Animal animal = new Animal()
+                {
+                    IdAnimal = reader.GetInt32(idAnimalOrdinal),
+                    Name = reader.GetString(nameOrdinal),
+                    Description = reader.IsDBNull(descriptionOrdinal) ? null : reader.GetString(descriptionOrdinal),
+                    Category = reader.IsDBNull(categoryOrdinal) ? null : reader.GetString(categoryOrdinal),
+                    Area = reader.IsDBNull(areaOrdinal) ? null : reader.GetString(areaOrdinal)
+                };
+                animals.Add(animal);
+            }
+            return Ok(animals);
+        }
+    }
+    
     [HttpPost]
     public IActionResult AddAnimal(AddAnimal animal)
     {
-        /*using ()
-        {   
-        }
-        try
-        {
-        }
-
-        finally
-        {
-           connection.Dispose();
-        }*/
-        //Otwieramy polaczenie
-        SqlConnection connection=new SqlConnection(_configuration.GetConnectionString("Default"));
+        SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
         connection.Open();
-        
-        //Definiujemy commanda
         SqlCommand command = new SqlCommand();
         command.Connection = connection;
-        command.CommandText = "INSERT INTO Animal VALUES (@animalName, '', '', '')";
+        command.CommandText = "INSERT INTO Animal (Name, Description, Category, Area) VALUES (@animalName, @animalDescription, @animalCategory, @animalArea)";
         command.Parameters.AddWithValue("@animalName", animal.Name);
+        command.Parameters.AddWithValue("@animalDescription", animal.Description);
+        command.Parameters.AddWithValue("@animalCategory", animal.Category);
+        command.Parameters.AddWithValue("@animalArea", animal.Area);
         command.ExecuteNonQuery();
-        
-        
+
         return Created("", null);
     }
-
-    [HttpDelete]
-    public IActionResult DeleteAnimals()
+    
+    [HttpDelete("{idAnimal}")]
+    public IActionResult DeleteAnimal(int idAnimal)
     {
         SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
         connection.Open();
-
         SqlCommand command = new SqlCommand();
         command.Connection = connection;
-        command.CommandText = "DELETE FROM Animals WHERE ID=@IdAnmial";
-        command.ExecuteNonQuery();
-
-        return NoContent();
+        command.CommandText = "DELETE FROM Animal WHERE IdAnimal = @IdAnimal";
+        command.Parameters.AddWithValue("@IdAnimal", idAnimal);
+        int rowsAffected = command.ExecuteNonQuery();
+        
+        if (rowsAffected == 0)
+        {
+            return NotFound($"Animal with ID {idAnimal} not found.");
+        }
+        return Ok($"Deleted animal with ID={idAnimal}");
     }
-
-    [HttpPut]
-    public IActionResult UpdateAnimals()
+    
+    [HttpPut("{animalName}")]
+    public IActionResult UpdateAnimal(string animalName, Animal animal)
     {
         SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
         connection.Open();
-
         SqlCommand command = new SqlCommand();
+            
         command.Connection = connection;
-        command.CommandText = "UPDATE ANIMALS";
-        command.ExecuteNonQuery();
-        return NoContent();
+        command.CommandText = "UPDATE Animal SET Name = @animalName, Description = @animalDescription, Category = @animalCategory, Area = @animalArea WHERE Name = @originalName";
+        command.Parameters.AddWithValue("@animalName", animal.Name);
+        command.Parameters.AddWithValue("@animalDescription", animal.Description);
+        command.Parameters.AddWithValue("@animalCategory", animal.Category);
+        command.Parameters.AddWithValue("@animalArea", animal.Area);
+        command.Parameters.AddWithValue("@originalName", animalName);
+        int rowsAffected = command.ExecuteNonQuery();
+                
+        if (rowsAffected == 0)
+        {
+            return NotFound($"Animal with name '{animalName}' not found.");
+        }
+        return Ok($"Updated the animal with name={animalName}");
     }
 }
