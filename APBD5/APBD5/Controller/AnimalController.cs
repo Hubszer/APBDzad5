@@ -58,30 +58,20 @@ public class AnimalsController : ControllerBase
     [HttpPost]
     public IActionResult AddAnimal(AddAnimal animal)
     {
-
         /*using ()
-        {
-            
+        {   
         }
-
         try
         {
-
-
-
         }
 
         finally
         {
-
-            connection.Dispose();
-
+           connection.Dispose();
         }*/
         //Otwieramy polaczenie
         SqlConnection connection=new SqlConnection(_configuration.GetConnectionString("Default"));
         connection.Open();
-        
-        
         
         //Definiujemy commanda
         SqlCommand command = new SqlCommand();
@@ -92,5 +82,32 @@ public class AnimalsController : ControllerBase
         
         
         return Created("", null);
+    }
+
+    [HttpDelete]
+    public IActionResult DeleteAnimals()
+    {
+        SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        connection.Open();
+
+        SqlCommand command = new SqlCommand();
+        command.Connection = connection;
+        command.CommandText = "DELETE FROM Animals WHERE ID=@IdAnmial";
+        command.ExecuteNonQuery();
+
+        return NoContent();
+    }
+
+    [HttpPut]
+    public IActionResult UpdateAnimals()
+    {
+        SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        connection.Open();
+
+        SqlCommand command = new SqlCommand();
+        command.Connection = connection;
+        command.CommandText = "UPDATE ANIMALS";
+        command.ExecuteNonQuery();
+        return NoContent();
     }
 }
